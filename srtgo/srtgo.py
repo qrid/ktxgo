@@ -13,6 +13,7 @@ import asyncio
 import click
 import inquirer
 import keyring
+import os
 import telegram
 import time
 import re
@@ -89,6 +90,7 @@ STATIONS = {
         "서대전",
         "김천구미",
         "동대구",
+        "서대구",
         "경주",
         "포항",
         "밀양",
@@ -113,8 +115,8 @@ STATIONS = {
     ],
 }
 DEFAULT_STATIONS = {
-    "SRT": ["수서", "대전", "동대구", "부산"],
-    "KTX": ["서울", "대전", "동대구", "부산"],
+    "SRT": ["수서", "대전", "동대구", "서대구", "부산"],
+    "KTX": ["서울", "대전", "동대구", "서대구", "부산"],
 }
 
 # 예약 간격 (평균 간격 (초) = SHAPE * SCALE): gamma distribution (1.25 +/- 0.25 s)
@@ -126,6 +128,11 @@ WAITING_BAR = ["|", "/", "-", "\\"]
 
 RailType = Union[str, None]
 ChoiceType = Union[int, None]
+
+LOGIN_ENV_VARS = {
+    "SRT": ("KSKILL_SRT_ID", "KSKILL_SRT_PASSWORD"),
+    "KTX": ("KSKILL_KTX_ID", "KSKILL_KTX_PASSWORD"),
+}
 
 
 @click.command()
@@ -430,15 +437,29 @@ def set_login(rail_type="SRT", debug=False):
         return False
 
 
+def get_env_login(rail_type="SRT"):
+    id_var, password_var = LOGIN_ENV_VARS[rail_type]
+    user_id = os.getenv(id_var)
+    password = os.getenv(password_var)
+    if user_id and password:
+        return user_id, password
+    return None, None
+
+
 def login(rail_type="SRT", debug=False):
-    if (
+    env_user_id, env_password = get_env_login(rail_type)
+    if env_user_id and env_password:
+        user_id, password = env_user_id, env_password
+    elif (
         keyring.get_password(rail_type, "id") is None
         or keyring.get_password(rail_type, "pass") is None
     ):
         set_login(rail_type)
-
-    user_id = keyring.get_password(rail_type, "id")
-    password = keyring.get_password(rail_type, "pass")
+        user_id = keyring.get_password(rail_type, "id")
+        password = keyring.get_password(rail_type, "pass")
+    else:
+        user_id = keyring.get_password(rail_type, "id")
+        password = keyring.get_password(rail_type, "pass")
 
     rail = SRT if rail_type == "SRT" else Korail
     return rail(user_id, password, verbose=debug)
@@ -811,7 +832,7 @@ def _is_seat_available(train, seat_type, rail_type):
         return train.special_seat_available()
     else:
         if not train.has_seat():
-            return train.has_waiting_list()
+            return False
         if seat_type in [ReserveOption.GENERAL_FIRST, ReserveOption.SPECIAL_FIRST]:
             return train.has_seat()
         if seat_type == ReserveOption.GENERAL_ONLY:
