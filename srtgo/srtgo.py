@@ -1,7 +1,7 @@
 try:
-    from curl_cffi.requests.exceptions import ConnectionError
+    from curl_cffi.requests.exceptions import ConnectionError, Timeout
 except ImportError:
-    from requests.exceptions import ConnectionError
+    from requests.exceptions import ConnectionError, Timeout
 
 from datetime import datetime, timedelta
 from json.decoder import JSONDecodeError
@@ -342,6 +342,17 @@ def get_telegram() -> Optional[Callable[[str], Awaitable[None]]]:
                 await bot.send_message(chat_id=chat_id, text=text)
 
     return tgprintf
+
+
+def send_telegram(text: str, raise_error: bool = False) -> bool:
+    try:
+        asyncio.run(get_telegram()(text))
+        return True
+    except Exception as ex:
+        if raise_error:
+            raise
+        print(colored(f"텔레그램 전송 실패: {ex}", "yellow"))
+        return False
 
 
 def set_card() -> None:
@@ -712,8 +723,7 @@ def reserve(rail_type="SRT", debug=False):
             )
             msg += "\n결제 완료"
 
-        tgprintf = get_telegram()
-        asyncio.run(tgprintf(msg))
+        send_telegram(msg)
 
     # Reservation loop
     i_try = 0
@@ -790,8 +800,10 @@ def reserve(rail_type="SRT", debug=False):
             _sleep()
             rail = login(rail_type, debug=debug)
 
-        except ConnectionError as ex:
-            if not _handle_error(ex, "연결이 끊겼습니다"):
+        except (ConnectionError, Timeout) as ex:
+            if not _handle_error(
+                ex, "연결이 끊기거나 시간 초과되었습니다. 다시 로그인합니다.", confirm=False
+            ):
                 return
             rail = login(rail_type, debug=debug)
 
@@ -810,14 +822,15 @@ def _sleep():
     )
 
 
-def _handle_error(ex, msg=None):
+def _handle_error(ex, msg=None, confirm=True):
     msg = (
         msg
         or f"\nException: {ex}, Type: {type(ex)}, Message: {ex.msg if hasattr(ex, 'msg') else 'No message attribute'}"
     )
     print(msg)
-    tgprintf = get_telegram()
-    asyncio.run(tgprintf(msg))
+    send_telegram(msg)
+    if not confirm:
+        return True
     return inquirer.confirm(message="계속할까요", default=True)
 
 
@@ -885,8 +898,7 @@ def check_reservation(rail_type="SRT", debug=False):
                         out.extend(map(str, reservation.tickets))
 
             if out:
-                tgprintf = get_telegram()
-                asyncio.run(tgprintf("\n".join(out)))
+                send_telegram("\n".join(out))
             return
 
         # If choice is an unpaid reservation, ask to pay or cancel
