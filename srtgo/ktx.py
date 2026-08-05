@@ -786,6 +786,7 @@ class Korail:
                 p.count for p in passengers if isinstance(p, Disability4To6Passenger)
             ),
         }
+        include_srt = train_type == TrainType.ALL
 
         data = {
             "Device": self._device,
@@ -806,8 +807,8 @@ class Korail:
             "txtSeatAttCd_2": "000",
             "txtSeatAttCd_3": "000",
             "txtSeatAttCd_4": "015",
-            "ebizCrossCheck": "N",
-            "srtCheckYn": "N",  # SRT 함께 보기
+            "ebizCrossCheck": "Y" if include_srt else "N",
+            "srtCheckYn": "Y" if include_srt else "N",
             "rtYn": "N",  # 왕복
             "adjStnScdlOfrFlg": "N",  # 인접역 보기
             "mbCrdNo": self.membership_number,

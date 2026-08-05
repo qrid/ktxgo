@@ -21,6 +21,7 @@ import re
 from .ktx import (
     Korail,
     KorailError,
+    NoResultsError,
     ReserveOption,
     TrainType,
     AdultPassenger,
@@ -79,6 +80,7 @@ STATIONS = {
         "포항",
     ],
     "KTX": [
+        "수서",
         "서울",
         "용산",
         "영등포",
@@ -116,7 +118,7 @@ STATIONS = {
 }
 DEFAULT_STATIONS = {
     "SRT": ["수서", "대전", "동대구", "서대구", "부산"],
-    "KTX": ["서울", "대전", "동대구", "서대구", "부산"],
+    "KTX": ["수서", "서울", "대전", "동대구", "서대구", "부산"],
 }
 
 # 예약 간격 (평균 간격 (초) = SHAPE * SCALE): gamma distribution (1.25 +/- 0.25 s)
@@ -656,7 +658,11 @@ def reserve(rail_type="SRT", debug=False):
         ),
     }
 
-    trains = rail.search_train(**params)
+    try:
+        trains = rail.search_train(**params)
+    except NoResultsError:
+        print(colored("조회된 열차가 없습니다", "green", "on_red") + "\n")
+        return
 
     def train_decorator(train):
         msg = train.__repr__()
