@@ -139,7 +139,7 @@ LOGIN_ENV_VARS = {
 
 @click.command()
 @click.option("--debug", is_flag=True, help="Debug mode")
-def srtgo(debug=False):
+def ktxgo(debug=False):
     MENU_CHOICES = [
         ("예매 시작", 1),
         ("예매 확인/결제/취소", 2),
@@ -325,7 +325,7 @@ def set_telegram() -> bool:
         keyring.set_password("telegram", "token", token)
         keyring.set_password("telegram", "chat_id", chat_id)
         tgprintf = get_telegram()
-        asyncio.run(tgprintf("[SRTGO] 텔레그램 설정 완료"))
+        asyncio.run(tgprintf("[KTXGO] 텔레그램 설정 완료"))
         return True
     except Exception as err:
         print(err)
@@ -942,4 +942,4 @@ def check_reservation(rail_type="SRT", debug=False):
 
 
 if __name__ == "__main__":
-    srtgo()
+    ktxgo()
