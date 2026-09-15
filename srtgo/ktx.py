@@ -29,6 +29,20 @@ from functools import reduce
 EMAIL_REGEX = re.compile(r"[^@]+@[^@]+\.[^@]+")
 PHONE_NUMBER_REGEX = re.compile(r"(\d{3})-(\d{3,4})-(\d{4})")
 
+
+def normalize_phone(value: str) -> str:
+    """하이픈 없이 입력한 휴대폰 번호(예: 01012345678)를 PHONE_NUMBER_REGEX가 인식하는
+    010-1234-5678 형태로 정규화한다. 전화번호 형태가 아니면(이메일, 멤버십 번호 등)
+    그대로 반환한다 — 하이픈이 없으면 이메일도 전화번호도 아닌 멤버십 번호로 잘못
+    분류돼 로그인이 조용히 실패하는 문제가 있었다."""
+    digits = re.sub(r"\D", "", value)
+    if len(digits) == 11 and digits.startswith("01"):
+        return f"{digits[:3]}-{digits[3:7]}-{digits[7:]}"
+    if len(digits) == 10 and digits.startswith("01"):
+        return f"{digits[:3]}-{digits[3:6]}-{digits[6:]}"
+    return value
+
+
 USER_AGENT = "Dalvik/2.1.0 (Linux; U; Android 13; SM-S928N Build/UP1A.231005.007)"
 
 DEFAULT_HEADERS = {
@@ -673,7 +687,7 @@ class Korail:
         self._key = "korail1234567890"
         self._idx = None
         self._engine = DynaPathMasterEngine()
-        self.korail_id = korail_id
+        self.korail_id = normalize_phone(korail_id)
         self.korail_pw = korail_pw
         self.verbose = verbose
         self.logined = False
@@ -725,7 +739,7 @@ class Korail:
 
     def login(self, korail_id=None, korail_pw=None):
         if korail_id:
-            self.korail_id = korail_id
+            self.korail_id = normalize_phone(korail_id)
         if korail_pw:
             self.korail_pw = korail_pw
 
