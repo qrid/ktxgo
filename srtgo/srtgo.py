@@ -29,6 +29,7 @@ from .ktx import (
     SeniorPassenger,
     Disability1To3Passenger,
     Disability4To6Passenger,
+    get_all_stations,
 )
 
 from .srt import (
@@ -123,6 +124,25 @@ DEFAULT_STATIONS = {
     "SRT": ["수서", "대전", "동대구", "서대구", "부산"],
     "KTX": ["수서", "서울", "대전", "동대구", "서대구", "부산"],
 }
+
+_ktx_station_cache: Optional[List[str]] = None
+
+
+def _ktx_stations() -> List[str]:
+    """KTX 역 목록. 하드코딩된 STATIONS["KTX"]를 기본값으로 쓰고, 코레일 역 마스터
+    (로그인 불필요) 조회가 성공하면 거기서 확인된 주요역을 추가로 병합한다.
+    조회에 실패하면 하드코딩된 목록만 그대로 쓴다."""
+    global _ktx_station_cache
+    if _ktx_station_cache is not None:
+        return _ktx_station_cache
+
+    merged = list(STATIONS["KTX"])
+    for station in get_all_stations():
+        if station["major"] and station["name"] not in merged:
+            merged.append(station["name"])
+
+    _ktx_station_cache = merged
+    return merged
 
 # 예약 간격 (평균 간격 (초) = SHAPE * SCALE): gamma distribution (1.25 +/- 0.25 s)
 RESERVE_INTERVAL_SHAPE = 4
@@ -259,7 +279,7 @@ def edit_station(rail_type: RailType) -> bool:
 
 
 def get_station(rail_type: RailType) -> Tuple[List[str], List[int]]:
-    stations = STATIONS[rail_type]
+    stations = _ktx_stations() if rail_type == "KTX" else STATIONS[rail_type]
     station_key = keyring.get_password(rail_type, "station")
 
     if not station_key:

@@ -53,6 +53,7 @@ API_ENDPOINTS = {
     "pay": f"{KORAIL_MOBILE}.payment.ReservationPayment",
     "refund": f"{KORAIL_MOBILE}.refunds.RefundsRequest",
     "code": f"{KORAIL_MOBILE}.common.code.do",
+    "stationdata": f"{KORAIL_MOBILE}.common.stationdata",
 }
 
 DYNAPATH_PATHS = (
@@ -624,6 +625,35 @@ class DynaPathMasterEngine:
         table = self.make_encode_table(self.make_key(dyn_key), self.i9, self.table)
         body_encoded = self.encode_normal_be(plaintext, table)
         return f"bEeEP{self.table[len(key_encoded)]}{key_encoded}{body_encoded}"
+
+
+def get_all_stations(verbose: bool = False):
+    """코레일 역 마스터 전체를 조회한다 (로그인 불필요, 공개 API).
+
+    반환값은 ``{"name": 역이름, "major": 주요역 여부}`` 딕셔너리 리스트. 조회에
+    실패하면 빈 리스트를 반환하므로 호출부는 하드코딩된 폴백 목록을 그대로 쓰면 된다.
+    """
+    try:
+        if HAS_CURL_CFFI:
+            session = curl_cffi.Session(impersonate="chrome131_android")
+        else:
+            session = requests.session()
+        session.headers.update(DEFAULT_HEADERS)
+
+        r = session.post(API_ENDPOINTS["stationdata"])
+        if verbose:
+            print(f"[*] {r.text}")
+        j = json.loads(r.text)
+
+        return [
+            {"name": name, "major": bool(station.get("major"))}
+            for station in j.get("stns", {}).get("stn", [])
+            if (name := station.get("stn_nm"))
+        ]
+    except Exception as ex:
+        if verbose:
+            print(f"[*] 역 목록 조회 실패: {ex}")
+        return []
 
 
 class Korail:
