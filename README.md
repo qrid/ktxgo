@@ -22,7 +22,8 @@
 - 자주 사용하는 역 설정 및 직접 수정
 - 어린이, 경로우대, 장애인 승객 옵션
 - KTX 검색 시 KTX 열차만 조회하는 옵션
-- 인접역 조회 옵션 (서울/용산-수서 등 통합 정차역 함께 검색)
+- 인접역 포함 조회 옵션
+- SRT 통합조회 제외 옵션 (서울/용산-수서 등 함께 보기 끄기)
 - 매진 시 예약대기 신청
 
 ---
@@ -44,7 +45,8 @@
 - Favorite station presets and direct station editing
 - Child, senior, and disabled passenger options
 - KTX-only train search option
-- Adjacent station search (e.g., search Seoul/Yongsan and Suseo together)
+- Adjacent station search option
+- Option to exclude integrated SRT search (turn off showing Seoul/Yongsan and Suseo departures together)
 - Waitlist for sold-out trains
 
 ## Installation / Update
@@ -137,10 +139,15 @@ Optional settings:
    [ ] 중증장애인
    [ ] 경증장애인
    [ ] KTX만
-   [ ] 인접역 조회 (서울/용산-수서 등 함께 보기)
+   [ ] 인접역 포함 조회
+   [ ] SRT 통합조회 제외 (서울/용산-수서 등 함께 보기 끄기)
 ```
 
-KTX 열차 조회 시 `인접역 조회` 옵션을 켜면 코레일-SRT 통합 이후 함께 운영되는 인접 역(예: 서울/용산-수서)의 열차도 같이 검색됩니다.
+KTX 열차 조회에는 코레일+ 앱과 동일하게 두 가지 독립적인 옵션이 있습니다.
+- `인접역 포함 조회`: 검색 역 근처의 다른 역(예: 서울-서대전 조회 시 용산-서대전)도 시간순으로 함께 보여줍니다.
+- `SRT 통합조회 제외`: 기본적으로 KTX 검색에는 SRT 열차(수서 등 출발)가 함께 조회되는데, 이 옵션을 켜면 SRT를 제외하고 순수 KTX 열차만 조회합니다.
+
+두 옵션을 함께 켜면(기본값인 SRT 통합조회 유지 + 인접역 포함 조회 켜기) 서울/용산 조회 시 수서 출발 열차까지 인접역으로 함께 표시됩니다.
 
 ## Reservation Flow
 Choose `예매 시작`, then select `SRT` or `KTX`.

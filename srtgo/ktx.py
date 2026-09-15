@@ -764,6 +764,7 @@ class Korail:
         include_no_seats=False,
         include_waiting_list=False,
         include_adjacent=False,
+        include_srt=True,
     ):
         kst_now = datetime.now() + timedelta(hours=9)
         date = date or kst_now.strftime("%Y%m%d")
@@ -787,7 +788,6 @@ class Korail:
                 p.count for p in passengers if isinstance(p, Disability4To6Passenger)
             ),
         }
-        include_srt = train_type == TrainType.ALL
 
         data = {
             "Device": self._device,
@@ -808,10 +808,10 @@ class Korail:
             "txtSeatAttCd_2": "000",
             "txtSeatAttCd_3": "000",
             "txtSeatAttCd_4": "015",
-            "ebizCrossCheck": "Y" if include_srt else "N",
-            "srtCheckYn": "Y" if include_srt else "N",
+            "ebizCrossCheck": "Y" if include_srt else "N",  # SRT 통합조회 (서울/용산-수서 함께 보기)
+            "srtCheckYn": "Y" if include_srt else "N",  # SRT 통합조회 (서울/용산-수서 함께 보기)
             "rtYn": "N",  # 왕복
-            "adjStnScdlOfrFlg": "Y" if include_adjacent else "N",  # 인접역 보기 (예: 서울/용산-수서)
+            "adjStnScdlOfrFlg": "Y" if include_adjacent else "N",  # 인접역 포함 조회
             "mbCrdNo": self.membership_number,
         }
         headers, sid = self._auth_headers_and_sid(API_ENDPOINTS["search_schedule"])
