@@ -287,6 +287,11 @@ If the selected item is an unpaid reservation, SRTgo asks whether to pay or canc
 - KTX date choices are available up to D-31 after 07:00, otherwise D-30.
 - Passenger count must be at least 1 and less than 10.
 - For same-day reservations, if the selected time is earlier than the current time plus 10 minutes, SRTgo searches from the adjusted current time.
+- Login relies on `curl_cffi` to match the mobile app's TLS fingerprint; on some Windows setups
+  (missing VC++ redistributable, antivirus blocking the DLL) `curl_cffi` installs but fails only
+  when a session is actually created. SRTgo probes this at import time and falls back to `requests`
+  automatically, but requests-based logins may still be rejected by servers that check TLS
+  fingerprints — reinstalling `curl_cffi` (`pip install curl_cffi -U`) is the usual fix.
 
 ## Acknowledgments
 - This project includes code from [SRT](https://github.com/ryanking13/SRT) by ryanking13, licensed under the MIT License, and [korail2](https://github.com/carpedm20/korail2) by carpedm20, licensed under the BSD License.
