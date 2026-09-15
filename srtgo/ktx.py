@@ -763,6 +763,7 @@ class Korail:
         passengers=None,
         include_no_seats=False,
         include_waiting_list=False,
+        include_adjacent=False,
     ):
         kst_now = datetime.now() + timedelta(hours=9)
         date = date or kst_now.strftime("%Y%m%d")
@@ -810,7 +811,7 @@ class Korail:
             "ebizCrossCheck": "Y" if include_srt else "N",
             "srtCheckYn": "Y" if include_srt else "N",
             "rtYn": "N",  # 왕복
-            "adjStnScdlOfrFlg": "N",  # 인접역 보기
+            "adjStnScdlOfrFlg": "Y" if include_adjacent else "N",  # 인접역 보기 (예: 서울/용산-수서)
             "mbCrdNo": self.membership_number,
         }
         headers, sid = self._auth_headers_and_sid(API_ENDPOINTS["search_schedule"])

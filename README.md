@@ -22,6 +22,7 @@
 - 자주 사용하는 역 설정 및 직접 수정
 - 어린이, 경로우대, 장애인 승객 옵션
 - KTX 검색 시 KTX 열차만 조회하는 옵션
+- 인접역 조회 옵션 (서울/용산-수서 등 통합 정차역 함께 검색)
 - 매진 시 예약대기 신청
 
 ---
@@ -43,6 +44,7 @@
 - Favorite station presets and direct station editing
 - Child, senior, and disabled passenger options
 - KTX-only train search option
+- Adjacent station search (e.g., search Seoul/Yongsan and Suseo together)
 - Waitlist for sold-out trains
 
 ## Installation / Update
@@ -126,7 +128,7 @@ Optional settings:
 - `카드 설정`: save card number, first two digits of card password, birth date or business registration number, and expiration date for automatic payment.
 - `역 설정`: choose favorite stations from the built-in station list.
 - `역 직접 수정`: enter stations directly, for example `수서,대전,동대구`.
-- `예매 옵션 설정`: enable passenger options and KTX-only search.
+- `예매 옵션 설정`: enable passenger options, KTX-only search, and adjacent station search.
 
 ```text
 [?] 예매 옵션 선택 (Space: 선택, Enter: 완료, Ctrl-A: 전체선택, Ctrl-R: 선택해제, Ctrl-C: 취소)
@@ -135,7 +137,10 @@ Optional settings:
    [ ] 중증장애인
    [ ] 경증장애인
    [ ] KTX만
+   [ ] 인접역 조회 (서울/용산-수서 등 함께 보기)
 ```
+
+KTX 열차 조회 시 `인접역 조회` 옵션을 켜면 코레일-SRT 통합 이후 함께 운영되는 인접 역(예: 서울/용산-수서)의 열차도 같이 검색됩니다.
 
 ## Reservation Flow
 Choose `예매 시작`, then select `SRT` or `KTX`.
