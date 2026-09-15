@@ -125,6 +125,58 @@ DEFAULT_STATIONS = {
     "KTX": ["수서", "서울", "대전", "동대구", "서대구", "부산"],
 }
 
+# 코레일+ 앱의 "서울/용산-수서 함께 보기"에 대응하는 역 그룹. adjStnScdlOfrFlg
+# (인접역 포함 조회) 서버 플래그만으로는 이 묶음이 항상 반영되지 않는 것으로
+# 확인되어(예: 서울→진주 조회 시 수서 출발이 나오지 않음), 그룹에 속한 역들을
+# 각각 조회해 클라이언트에서 합쳐 보여준다.
+KTX_STATION_GROUPS = [
+    {"서울", "용산", "수서"},
+]
+
+
+def _station_group(station: str) -> set:
+    for group in KTX_STATION_GROUPS:
+        if station in group:
+            return group
+    return {station}
+
+
+def _train_fingerprint(train):
+    return (train.train_no, train.dep_code, train.dep_date, train.dep_time)
+
+
+def search_trains(rail, params: dict, expand_group: bool = False):
+    """rail.search_train을 감싸서, expand_group이면 인접 역 그룹(예: 서울/용산/수서)의
+    모든 조합을 조회해 결과를 합치고 출발 시각순으로 정렬한다."""
+    if not expand_group:
+        return rail.search_train(**params)
+
+    dep_group = _station_group(params["dep"])
+    arr_group = _station_group(params["arr"])
+
+    trains = []
+    seen = set()
+    for dep in dep_group:
+        for arr in arr_group:
+            if dep == arr:
+                continue
+            try:
+                result = rail.search_train(**{**params, "dep": dep, "arr": arr})
+            except NoResultsError:
+                continue
+            for train in result:
+                fingerprint = _train_fingerprint(train)
+                if fingerprint not in seen:
+                    seen.add(fingerprint)
+                    trains.append(train)
+
+    if not trains:
+        raise NoResultsError()
+
+    trains.sort(key=lambda t: (t.dep_date, t.dep_time, t.train_no))
+    return trains
+
+
 _ktx_station_cache: Optional[List[str]] = None
 
 
@@ -684,9 +736,10 @@ def reserve(rail_type="SRT", debug=False):
             }
         ),
     }
+    expand_group = not is_srt and "adjacent" in options
 
     try:
-        trains = rail.search_train(**params)
+        trains = search_trains(rail, params, expand_group)
     except NoResultsError:
         print(colored("조회된 열차가 없습니다", "green", "on_red") + "\n")
         return
@@ -785,7 +838,7 @@ def reserve(rail_type="SRT", debug=False):
                 flush=True,
             )
 
-            trains = rail.search_train(**params)
+            trains = search_trains(rail, params, expand_group)
             for i in choice["trains"]:
                 if _is_seat_available(trains[i], options["type"], rail_type):
                     _reserve(trains[i])
