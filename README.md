@@ -128,7 +128,10 @@ Optional settings:
 
 - `텔레그램 설정`: save Telegram bot token and chat ID, then receive reservation notifications.
 - `카드 설정`: save card number, first two digits of card password, birth date or business registration number, and expiration date for automatic payment.
-- `역 설정`: choose favorite stations from the built-in station list.
+- `역 설정`: choose favorite stations from the station list. For KTX, the built-in list is
+  merged with the live station master fetched from Korail's public `stationdata` API (no
+  login required), so newly integrated stations show up automatically; if that request
+  fails, the built-in list alone is used.
 - `역 직접 수정`: enter stations directly, for example `수서,대전,동대구`.
 - `예매 옵션 설정`: enable passenger options, KTX-only search, and adjacent station search.
 
