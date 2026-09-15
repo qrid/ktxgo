@@ -730,11 +730,23 @@ def reserve(rail_type="SRT", debug=False):
 
         print(colored(f"\n\n🎫 🎉 예매 성공!!! 🎉 🎫\n{msg}\n", "red", "on_green"))
 
-        if options["pay"] and not reserve.is_waiting and pay_card(rail, reserve):
-            print(
-                colored("\n\n💳 ✨ 결제 성공!!! ✨ 💳\n\n", "green", "on_red"), end=""
-            )
-            msg += "\n결제 완료"
+        if options["pay"] and not reserve.is_waiting:
+            try:
+                paid = pay_card(rail, reserve)
+            except (SRTError, KorailError) as err:
+                # 결제 실패 시 예매 자체는 살리고 카드 결제를 안 한 것처럼 미결제 상태로 남긴다
+                paid = False
+                print(
+                    colored(f"\n\n💳 ❌ 카드 결제 실패, 미결제 상태로 둡니다: {err}\n\n", "yellow")
+                )
+
+            if paid:
+                print(
+                    colored("\n\n💳 ✨ 결제 성공!!! ✨ 💳\n\n", "green", "on_red"), end=""
+                )
+                msg += "\n결제 완료"
+            else:
+                msg += "\n결제 실패 (미결제, 구입기한 내 직접 결제 필요)"
 
         send_telegram(msg)
 
