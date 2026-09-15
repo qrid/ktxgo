@@ -21,6 +21,20 @@ from typing import Dict, List, Pattern
 EMAIL_REGEX: Pattern = re.compile(r"[^@]+@[^@]+\.[^@]+")
 PHONE_NUMBER_REGEX: Pattern = re.compile(r"(\d{3})-(\d{3,4})-(\d{4})")
 
+
+def normalize_phone(value: str) -> str:
+    """하이픈 없이 입력한 휴대폰 번호(예: 01012345678)를 PHONE_NUMBER_REGEX가 인식하는
+    010-1234-5678 형태로 정규화한다. 전화번호 형태가 아니면(이메일, 멤버십 번호 등)
+    그대로 반환한다 — 하이픈이 없으면 이메일도 전화번호도 아닌 멤버십 번호로 잘못
+    분류돼 로그인이 조용히 실패하는 문제가 있었다."""
+    digits = re.sub(r"\D", "", value)
+    if len(digits) == 11 and digits.startswith("01"):
+        return f"{digits[:3]}-{digits[3:7]}-{digits[7:]}"
+    if len(digits) == 10 and digits.startswith("01"):
+        return f"{digits[:3]}-{digits[3:6]}-{digits[6:]}"
+    return value
+
+
 USER_AGENT = (
     "Mozilla/5.0 (Linux; Android 15; SM-S912N Build/AP3A.240905.015.A2; wv) AppleWebKit/537.36"
     "(KHTML, like Gecko) Version/4.0 Chrome/136.0.7103.125 Mobile Safari/537.36SRT-APP-Android V.2.0.38"
@@ -659,7 +673,7 @@ class SRT:
             self._session = requests.session()
         self._session.headers.update(DEFAULT_HEADERS)
         self._netfunnel = NetFunnelHelper(debug=verbose)
-        self.srt_id = srt_id
+        self.srt_id = normalize_phone(srt_id)
         self.srt_pw = srt_pw
         self.verbose = verbose
         self.is_login = False
@@ -689,7 +703,7 @@ class SRT:
         Raises:
             SRTLoginError: If login fails
         """
-        srt_id = srt_id or self.srt_id
+        srt_id = normalize_phone(srt_id or self.srt_id)
         srt_pw = srt_pw or self.srt_pw
 
         login_type = (
