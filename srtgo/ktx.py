@@ -9,8 +9,12 @@ korail2.korail2
 import base64
 try:
     import curl_cffi
+    # import만으로는 부족하다 — Windows 일부 환경에서는 curl_cffi가 설치·임포트는
+    # 되지만 libcurl DLL 로딩이 세션 생성 시점에야 실패한다(예: VC++ 재배포 패키지
+    # 누락, 백신 차단). 여기서 한 번 실제로 세션을 만들어 봐서 확인한다.
+    curl_cffi.Session(impersonate="chrome131_android").close()
     HAS_CURL_CFFI = True
-except ImportError:
+except Exception:
     import requests
     HAS_CURL_CFFI = False
 import itertools
