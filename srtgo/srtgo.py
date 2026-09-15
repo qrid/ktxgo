@@ -114,6 +114,9 @@ STATIONS = {
         "강릉",
         "행신",
         "정동진",
+        "진영",
+        "창원",
+        "진주",
     ],
 }
 DEFAULT_STATIONS = {
@@ -279,6 +282,7 @@ def set_options():
                     ("중증장애인", "disability1to3"),
                     ("경증장애인", "disability4to6"),
                     ("KTX만", "ktx"),
+                    ("인접역 조회 (서울/용산-수서 등 함께 보기)", "adjacent"),
                 ],
                 default=default_options,
             )
@@ -654,6 +658,7 @@ def reserve(rail_type="SRT", debug=False):
             else {
                 "include_no_seats": True,
                 **({"train_type": TrainType.KTX} if "ktx" in options else {}),
+                **({"include_adjacent": True} if "adjacent" in options else {}),
             }
         ),
     }
