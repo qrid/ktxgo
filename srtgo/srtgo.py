@@ -282,7 +282,8 @@ def set_options():
                     ("중증장애인", "disability1to3"),
                     ("경증장애인", "disability4to6"),
                     ("KTX만", "ktx"),
-                    ("인접역 조회 (서울/용산-수서 등 함께 보기)", "adjacent"),
+                    ("인접역 포함 조회", "adjacent"),
+                    ("SRT 통합조회 제외 (서울/용산-수서 등 함께 보기 끄기)", "no_srt"),
                 ],
                 default=default_options,
             )
@@ -659,6 +660,7 @@ def reserve(rail_type="SRT", debug=False):
                 "include_no_seats": True,
                 **({"train_type": TrainType.KTX} if "ktx" in options else {}),
                 **({"include_adjacent": True} if "adjacent" in options else {}),
+                **({"include_srt": False} if "no_srt" in options else {}),
             }
         ),
     }
