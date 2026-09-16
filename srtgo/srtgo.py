@@ -1033,6 +1033,13 @@ def check_reservation(rail_type="SRT", debug=False):
             return
 
         # Else
+        if rail_type == "KTX" and all_reservations[choice].is_ticket:
+            try:
+                fee = rail.refund_fee(all_reservations[choice])
+                print(colored(f"환불 수수료 조회: {fee}", "yellow"))
+            except Exception as err:
+                print(colored(f"환불 수수료 조회 실패 (취소는 계속 진행 가능): {err}", "yellow"))
+
         if inquirer.confirm(
             message=colored("정말 취소하시겠습니까", "green", "on_red")
         ):
