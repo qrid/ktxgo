@@ -25,6 +25,7 @@
 - 인접역 포함 조회 옵션
 - SRT 통합조회 제외 옵션 (서울/용산-수서 등 함께 보기 끄기)
 - 매진 시 예약대기 신청
+- KTX 승차권 취소 전 환불 수수료 사전조회
 
 ---
 
@@ -48,6 +49,7 @@
 - Adjacent station search option
 - Option to exclude integrated SRT search (turn off showing Seoul/Yongsan and Suseo departures together)
 - Waitlist for sold-out trains
+- Refund fee preview before cancelling a paid KTX ticket
 
 ## Installation / Update
 ```bash

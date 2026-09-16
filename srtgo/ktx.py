@@ -70,6 +70,7 @@ API_ENDPOINTS = {
     "myreservationlist": f"{KORAIL_MOBILE}.certification.ReservationList",
     "pay": f"{KORAIL_MOBILE}.payment.ReservationPayment",
     "refund": f"{KORAIL_MOBILE}.refunds.RefundsRequest",
+    "refund_commission": f"{KORAIL_MOBILE}.refunds.CommissionView",
     "code": f"{KORAIL_MOBILE}.common.code.do",
     "stationdata": f"{KORAIL_MOBILE}.common.stationdata",
 }
@@ -285,6 +286,26 @@ class Seat:
                 f"{self.car}호차 {self.seat} ({self.seat_type}) {self.passenger_type} "
                 f"[{self.price}원({self.discount}원 할인)]"
             )
+
+
+class RefundFee:
+    """환불 수수료 사전조회 결과. 실제 환불은 하지 않는다.
+
+    ``prg_psb_flg`` 가 정확히 ``"Y"`` 일 때만 환불 가능으로 본다 — 빈 값이나
+    다른 값을 낙관적으로 가능하다고 해석하면 사용자가 환불되는 줄 알고
+    넘어갈 수 있다."""
+
+    def __init__(self, data: dict):
+        self.fee = int(data.get("ret_fee") or 0)
+        self.refund_amount = int(data.get("ret_amt") or 0)
+        self.usable_mileage = int(data.get("use_psb_mlg_num") or 0)
+        self.refundable = data.get("prg_psb_flg") == "Y"
+        self.process_type_code = data.get("tk_ret_tms_dv_cd")
+
+    def __repr__(self):
+        if not self.refundable:
+            return "환불 불가"
+        return f"{self.refund_amount}원 환불 (수수료 {self.fee}원)"
 
 
 # Passenger classes
@@ -1152,6 +1173,34 @@ class Korail:
         self._log(r.text)
         j = json.loads(r.text)
         return self._result_check(j)
+
+    def refund_fee(self, ticket) -> RefundFee:
+        """환불 전에 수수료·환급액·환불 가능 여부를 미리 조회한다 (실제 환불은 하지 않음).
+
+        ``refund()`` 와 같은 refunds 패키지의 다른 엔드포인트(CommissionView)를 쓰는데,
+        같은 값을 가리키면서도 폼 필드 이름이 다르다 — ``h_orgtk_sale_dt``/
+        ``h_orgtk_sale_wct_no`` (refund) 대 ``h_orgtk_ret_sale_dt``/``h_orgtk_wct_no``
+        (refund_fee). 실제 코레일 서버로 검증하지 못했으니 사용 전 확인이 필요하다.
+        """
+        data = {
+            "Device": self._device,
+            "Version": self._version,
+            "Key": self._key,
+            "h_orgtk_ret_sale_dt": ticket.sale_info2,
+            "h_orgtk_wct_no": ticket.sale_info1,
+            "h_orgtk_sale_sqno": ticket.sale_info3,
+            "h_orgtk_ret_pwd": ticket.sale_info4,
+            "h_comp_nm": "",
+            "h_comp_cert_no": "",
+            "ctlDvCd": "",
+            "lang": "",
+        }
+        r = self._session.post(API_ENDPOINTS["refund_commission"], data=data)
+        self._log(r.text)
+        j = json.loads(r.text)
+        if j.get("h_msg_cd"):
+            raise KorailError(j.get("h_msg_txt", "환불 수수료 조회 실패"), j.get("h_msg_cd"))
+        return RefundFee(j)
 
     def refund(self, ticket):
         data = {
