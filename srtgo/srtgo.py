@@ -29,6 +29,9 @@ from .ktx import (
     SeniorPassenger,
     Disability1To3Passenger,
     Disability4To6Passenger,
+    DeviceProfile,
+    device_profiles,
+    random_device_profile,
     get_all_stations,
 )
 
@@ -224,6 +227,7 @@ def srtgo(debug=False):
         ("역 설정", 6),
         ("역 직접 수정", 7),
         ("예매 옵션 설정", 8),
+        ("KTX 디바이스 변경", 9),
         ("나가기", -1),
     ]
 
@@ -242,6 +246,7 @@ def srtgo(debug=False):
         6: lambda rt: set_station(rt),
         7: lambda rt: edit_station(rt),
         8: lambda _: set_options(),
+        9: lambda _: set_device_profile(),
     }
 
     while True:
@@ -497,6 +502,65 @@ def _warn_srt_deprecated() -> None:
     )
 
 
+def get_device_profile() -> Optional[DeviceProfile]:
+    """KTX 로그인에 쓸 디바이스 프로필을 keyring에서 읽는다.
+
+    설정한 적이 없으면 None을 돌려주고, Korail은 이를 자체 기본 프로필로
+    처리한다."""
+    raw = keyring.get_password("KTX", "device_profile")
+    if not raw:
+        return None
+    try:
+        model, android, build_id = raw.split("|")
+    except ValueError:
+        return None
+    return DeviceProfile(model=model, android=android, build_id=build_id)
+
+
+def set_device_profile() -> bool:
+    """KTX 로그인에 쓸 디바이스(User-Agent/DynaPath 서명) 프로필을 고른다.
+
+    계정당 한 번 고르고 계속 재사용하는 것을 권장한다 — 로그인마다 기기를 바꾸는
+    건 정상적인 사용 패턴이 아니라 오히려 이상 탐지 신호가 될 수 있다."""
+    current = get_device_profile()
+    print(
+        f"현재 디바이스: {current.model} (Android {current.android})"
+        if current
+        else "현재 디바이스: 기본값 (SM-S928N, Android 13)"
+    )
+
+    choices = [
+        (f"{p.model} (Android {p.android}, Build {p.build_id})", p)
+        for p in device_profiles()
+    ] + [
+        ("무작위로 하나 선택", "random"),
+        ("기본값으로 되돌리기", "reset"),
+        ("취소", "cancel"),
+    ]
+    choice = inquirer.list_input(
+        message="KTX 디바이스 선택 (↕:이동, Enter: 선택, Ctrl-C: 취소)",
+        choices=choices,
+    )
+
+    if choice in (None, "cancel"):
+        return False
+
+    if choice == "reset":
+        try:
+            keyring.delete_password("KTX", "device_profile")
+        except Exception:
+            pass
+        print("기본 디바이스 프로필로 되돌렸습니다")
+        return True
+
+    profile = random_device_profile() if choice == "random" else choice
+    keyring.set_password(
+        "KTX", "device_profile", f"{profile.model}|{profile.android}|{profile.build_id}"
+    )
+    print(f"디바이스를 {profile.model} (Android {profile.android})로 변경했습니다")
+    return True
+
+
 def set_login(rail_type="SRT", debug=False):
     if rail_type == "SRT":
         _warn_srt_deprecated()
@@ -527,7 +591,10 @@ def set_login(rail_type="SRT", debug=False):
         SRT(
             login_info["id"], login_info["pass"], verbose=debug
         ) if rail_type == "SRT" else Korail(
-            login_info["id"], login_info["pass"], verbose=debug
+            login_info["id"],
+            login_info["pass"],
+            verbose=debug,
+            device_profile=get_device_profile(),
         )
 
         keyring.set_password(rail_type, "id", login_info["id"])
@@ -564,8 +631,9 @@ def login(rail_type="SRT", debug=False):
         user_id = keyring.get_password(rail_type, "id")
         password = keyring.get_password(rail_type, "pass")
 
-    rail = SRT if rail_type == "SRT" else Korail
-    return rail(user_id, password, verbose=debug)
+    if rail_type == "SRT":
+        return SRT(user_id, password, verbose=debug)
+    return Korail(user_id, password, verbose=debug, device_profile=get_device_profile())
 
 
 def reserve(rail_type="SRT", debug=False):
