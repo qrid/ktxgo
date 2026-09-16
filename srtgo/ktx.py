@@ -14,9 +14,22 @@ try:
     # 누락, 백신 차단). 여기서 한 번 실제로 세션을 만들어 봐서 확인한다.
     curl_cffi.Session(impersonate="chrome131_android").close()
     HAS_CURL_CFFI = True
-except Exception:
+    CURL_CFFI_ERROR = None
+except Exception as ex:
     import requests
     HAS_CURL_CFFI = False
+    CURL_CFFI_ERROR = ex
+    # pykorail(devgyurak)도 이 상황을 조용히 넘기지 않고 경고한다: requests는
+    # curl_cffi의 안드로이드 크롬 TLS 임퍼소네이션을 흉내낼 수 없다. User-Agent나
+    # DynaPath 서명(dm=/os=)을 아무리 바꿔도 TLS 핸드셰이크 지문 자체가 곧바로
+    # "코레일 앱이 아니다"라는 신호가 되므로, 디바이스 프로필을 바꿔도 로그인
+    # 실패가 똑같이 재현된다면 이게 원인일 수 있다. 지금까지는 이 폴백이
+    # 완전히 조용해서 사용자가 알 방법이 없었다.
+    print(
+        f"[!] curl_cffi를 사용할 수 없어 requests로 대체합니다 ({ex}). "
+        "TLS 지문이 코레일 앱과 달라져 어떤 디바이스 프로필을 쓰든 로그인이 거부될 수 있습니다. "
+        "`pip install curl_cffi -U` 로 재설치해 보세요."
+    )
 import itertools
 import json
 import random
