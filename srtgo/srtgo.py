@@ -487,7 +487,20 @@ def pay_card(rail, reservation) -> bool:
     return False
 
 
+def _warn_srt_deprecated() -> None:
+    print(
+        colored(
+            "⚠️  2026년 9월 1일부로 SRT는 KTX에 통합되었습니다. SRT 계정 기반 로그인/예매가 "
+            "더 이상 정상 동작하지 않을 수 있습니다 — 새 예매는 KTX로 진행해 주세요.",
+            "yellow",
+        )
+    )
+
+
 def set_login(rail_type="SRT", debug=False):
+    if rail_type == "SRT":
+        _warn_srt_deprecated()
+
     credentials = {
         "id": keyring.get_password(rail_type, "id") or "",
         "pass": keyring.get_password(rail_type, "pass") or "",
@@ -521,7 +534,7 @@ def set_login(rail_type="SRT", debug=False):
         keyring.set_password(rail_type, "pass", login_info["pass"])
         keyring.set_password(rail_type, "ok", "1")
         return True
-    except SRTError as err:
+    except (SRTError, KorailError) as err:
         print(err)
         keyring.delete_password(rail_type, "ok")
         return False

@@ -772,7 +772,7 @@ class Korail:
         self._log(r.text)
         j = json.loads(r.text)
 
-        if j["strResult"] == "SUCC" and j.get("strMbCrdNo"):
+        if j.get("strResult") == "SUCC" and j.get("strMbCrdNo"):
             self._key = j.get("Key", self._key)
             self.membership_number = j["strMbCrdNo"]
             self.name = j["strCustNm"]
@@ -783,7 +783,12 @@ class Korail:
             )
             self.logined = True
             return True
+
         self.logined = False
+        if j.get("strResult") != "FAIL":
+            # strResult=FAIL(오류)이나 strResult=SUCC(성공) 둘 다 아닌 예상 밖 응답
+            # 형태다 — 원인을 알 수 있게 원문을 포함해 에러를 낸다.
+            raise KorailError(f"예상치 못한 로그인 응답: {r.text}", j.get("h_msg_cd"))
         return False
 
     def logout(self):
