@@ -771,22 +771,37 @@ class Korail:
         cipher_info = j.get("app.login.cphd") or {}
         idx, key = cipher_info.get("idx"), cipher_info.get("key")
         if j.get("strResult") != "SUCC" or not idx or not key:
-            return False
+            # 여기서 False를 돌려주면 호출부(login)가 그 값을 그대로 txtPwd
+            # 폼 필드에 실어 보내 서버로부터 "비밀번호가 틀렸다"는 엉뚱한
+            # 응답을 받게 된다. 원인이 분명한 시점에 바로 예외를 낸다.
+            raise KorailError("비밀번호 암호화 키를 발급받지 못했습니다", j.get("h_msg_cd"))
 
         self._idx = idx
-        encrypt_key = key.encode("utf-8")
-        iv = key[:16].encode("utf-8")
-        cipher = AES.new(encrypt_key, AES.MODE_CBC, iv)
-        padded_data = pad(password.encode("utf-8"), AES.block_size)
-        return base64.b64encode(
-            base64.b64encode(cipher.encrypt(padded_data))
-        ).decode("utf-8")
+        try:
+            encrypt_key = key.encode("utf-8")
+            iv = key[:16].encode("utf-8")
+            cipher = AES.new(encrypt_key, AES.MODE_CBC, iv)
+            padded_data = pad(password.encode("utf-8"), AES.block_size)
+            return base64.b64encode(
+                base64.b64encode(cipher.encrypt(padded_data))
+            ).decode("utf-8")
+        except (AttributeError, TypeError, ValueError) as ex:
+            # 발급받은 key가 문자열이 아니거나 AES 키 길이(16/24/32바이트)
+            # 규격에 안 맞는 경우다. pycryptodome의 원본 예외는 호출부가
+            # 잡을 타입(KorailError)이 아니라 그대로 새면 로그인 실패가
+            # 원인 불명의 크래시로 보인다.
+            raise KorailError(f"발급받은 암호화 키를 사용할 수 없습니다: {ex}") from ex
 
     def login(self, korail_id=None, korail_pw=None):
         if korail_id:
             self.korail_id = normalize_phone(korail_id)
         if korail_pw:
             self.korail_pw = korail_pw
+
+        if not self.korail_id or not self.korail_pw:
+            # 아이디/비밀번호가 비어있으면 서버까지 갔다올 필요 없이 바로
+            # 실패시킨다 — keyring에 빈 값이 저장된 경우 등.
+            raise KorailError("아이디와 비밀번호가 필요합니다")
 
         txt_input_flg = (
             "5"
@@ -833,7 +848,14 @@ class Korail:
             # strResult=FAIL(오류)이나 strResult=SUCC(성공) 둘 다 아닌 예상 밖 응답
             # 형태다 — 원인을 알 수 있게 원문을 포함해 에러를 낸다.
             raise KorailError(f"예상치 못한 로그인 응답: {r.text}", j.get("h_msg_cd"))
-        return False
+        # 로그인 실패도 예외로 올린다 — bool 반환값을 확인하지 않는 호출부
+        # (생성자의 auto_login, srtgo.set_login())가 실패한 채로 계속 진행해
+        # 한참 뒤 엉뚱한 "Need to Login" 에러를 보게 되는 문제를 막는다.
+        # 서버가 준 이유를 그대로 전달한다.
+        raise KorailError(
+            j.get("h_msg_txt") or "아이디 또는 비밀번호가 올바르지 않습니다",
+            j.get("h_msg_cd"),
+        )
 
     def logout(self):
         r = self._session.get(API_ENDPOINTS["logout"])

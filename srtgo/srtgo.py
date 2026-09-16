@@ -899,9 +899,16 @@ def reserve(rail_type="SRT", debug=False):
         except KorailError as ex:
             msg = ex.msg
             if "Need to Login" in msg:
-                rail = login(rail_type, debug=debug)
-                if not rail.is_login and not _handle_error(ex):
-                    return
+                # KTX(Korail)는 is_login이 아니라 logined 속성을 쓴다 — 이 줄만
+                # SRT 쪽 속성명을 그대로 옮겨써서 AttributeError로 크래시했다.
+                # 게다가 login()은 이제 실패 시 반환 대신 KorailError를 던지므로
+                # 재로그인 자체가 실패해도(예: 서버 응답 형식 변경) 예매 루프가
+                # 죽지 않도록 잡아준다.
+                try:
+                    rail = login(rail_type, debug=debug)
+                except KorailError as login_ex:
+                    if not _handle_error(login_ex):
+                        return
             elif not any(
                 err in msg
                 for err in ("Sold out", "잔여석없음", "예약대기자한도수초과")
