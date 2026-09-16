@@ -23,6 +23,7 @@ import random
 import re
 import string
 import time
+from collections import namedtuple
 from Crypto.Cipher import AES
 from Crypto.Util.Padding import pad
 from datetime import datetime, timedelta
@@ -47,7 +48,70 @@ def normalize_phone(value: str) -> str:
     return value
 
 
-USER_AGENT = "Dalvik/2.1.0 (Linux; U; Android 13; SM-S928N Build/UP1A.231005.007)"
+DeviceProfile = namedtuple("DeviceProfile", ["model", "android", "build_id"])
+
+# 안드로이드 버전 -> 구글 정식 릴리스 빌드ID. 삼성폰도 ro.build.id로 이 값을 그대로
+# 쓴다. 버전당 하나로 고정한다 — 임의 조합은 실재하지 않는 조합이 되어 오히려
+# 탐지 신호가 될 수 있다.
+_BUILD_ID_BY_ANDROID = {
+    13: "TP1A.220624.014",
+    14: "UP1A.231005.007",
+    15: "AP3A.240905.015.A2",
+    16: "BP2A.250605.031",
+}
+
+# (모델, 유효 안드로이드 버전). 전부 한국 자급제(SM-...N) 갤럭시 모델만 쓴다 —
+# curl_cffi 임퍼소네이션(chrome131_android)이 안드로이드 크롬 계열이라 TLS
+# 지문도 이 모델군과 맞아야 한다. 통신사 전용(S/K/L 접미사)·아이폰 모델은 넣지 않는다.
+_DEVICE_MODELS = (
+    ("SM-G981N", (13,)),        # Galaxy S20
+    ("SM-G991N", (13, 14, 15)),  # Galaxy S21
+    ("SM-S901N", (13, 14, 15, 16)),  # Galaxy S22
+    ("SM-S911N", (13, 14, 15, 16)),  # Galaxy S23
+    ("SM-S918N", (13, 14, 15, 16)),  # Galaxy S23 Ultra
+    ("SM-S921N", (14, 15, 16)),  # Galaxy S24
+    ("SM-S928N", (14, 15, 16)),  # Galaxy S24 Ultra
+    ("SM-S931N", (15, 16)),      # Galaxy S25
+    ("SM-S938N", (15, 16)),      # Galaxy S25 Ultra
+    ("SM-F946N", (13, 14, 15, 16)),  # Galaxy Z Fold5
+    ("SM-F731N", (13, 14, 15, 16)),  # Galaxy Z Flip5
+    ("SM-A356N", (14, 15, 16)),  # Galaxy A35 5G
+)
+
+
+def device_profiles():
+    """정합성(모델 ↔ 유효 안드로이드 버전 ↔ 빌드ID)이 맞는 기기 프로필 전체 목록."""
+    return [
+        DeviceProfile(model=model, android=str(android), build_id=_BUILD_ID_BY_ANDROID[android])
+        for model, versions in _DEVICE_MODELS
+        for android in versions
+    ]
+
+
+def random_device_profile(rng=None):
+    """카탈로그에서 기기 프로필 하나를 무작위로 고른다.
+
+    한 번 고른 프로필은 계속 재사용하는 것을 권장한다 — 매 로그인마다 다른
+    폰인 척하는 것 자체가 오히려 부자연스러운 신호가 된다."""
+    return (rng or random).choice(device_profiles())
+
+
+def dalvik_user_agent(profile: "DeviceProfile") -> str:
+    """기기 프로필로 코레일 API가 받아들이는 Dalvik User-Agent를 만든다.
+
+    ``Dalvik/2.1.0`` 과 ``Linux; U;`` 는 고정이고 버전·모델·빌드ID만 프로필에서
+    바뀐다. 이 값은 :class:`DynaPathMasterEngine` 의 서명(``os=``·``dm=``)과
+    반드시 같은 기기를 가리켜야 한다 — 둘 다 같은 profile로 채워야 하는 이유다."""
+    return f"Dalvik/2.1.0 (Linux; U; Android {profile.android}; {profile.model} Build/{profile.build_id})"
+
+
+# 기본 프로필. korail2의 앱 리버싱 결과를 그대로 물려받은 값이라 android(13)와
+# build_id(UP1A.231005.007, 실제로는 Android 14 빌드ID)가 서로 안 맞지만, 이미
+# 서버가 받아주는 것으로 확인된 값이라 "고쳐서" 바꾸지 않는다 — 작동하는 값은
+# 근거 없이 바꾸지 않는다.
+DEFAULT_DEVICE_PROFILE = DeviceProfile(model="SM-S928N", android="13", build_id="UP1A.231005.007")
+
+USER_AGENT = dalvik_user_agent(DEFAULT_DEVICE_PROFILE)
 
 DEFAULT_HEADERS = {
     "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
@@ -577,16 +641,20 @@ class NetFunnelHelper:
 class DynaPathMasterEngine:
     APP_ID = "com.korail.talk"
     AS_VALUE = "%5B38ff229cb34c7dda8e28220a2d750cce%5D"
-    DEVICE_MODEL = "SM-S928N"
     OS_TYPE = "Android"
     SDK_VERSION = "v1"
 
-    def __init__(self):
+    def __init__(self, device_model=None, os_version=None):
         self.table = "3FE9jgRD4KdCyuawklqGJYmvfMn15P7US8XbxeLQtWT6OicBAopINs2Vh0HZrz"
         self.i8 = 161
         self.i9 = 30
         self.i10 = 2
         self.app_start_ts = str(int(time.time() * 1000))
+        # 기본값은 DEFAULT_DEVICE_PROFILE과 일치해야 한다 — User-Agent가 광고하는
+        # 기기와 이 서명이 광고하는 기기(os=, dm=)가 어긋나면 그 불일치 자체가
+        # 탐지 신호가 된다.
+        self.device_model = device_model or DEFAULT_DEVICE_PROFILE.model
+        self.os_version = os_version or DEFAULT_DEVICE_PROFILE.android
 
     def string2xa1s(self, data):
         result = []
@@ -675,7 +743,7 @@ class DynaPathMasterEngine:
     def generate_token(self, device_id, timestamp_ms, nonce):
         plaintext = (
             f"ai={self.APP_ID}&di={device_id}&as={self.AS_VALUE}&su=false&dbg=false&emu=false&hk=false"
-            f"&it={self.app_start_ts}&ts={timestamp_ms}&rt=0&os=13&dm={self.DEVICE_MODEL}&st={self.OS_TYPE}&sv={self.SDK_VERSION}"
+            f"&it={self.app_start_ts}&ts={timestamp_ms}&rt=0&os={self.os_version}&dm={self.device_model}&st={self.OS_TYPE}&sv={self.SDK_VERSION}"
         )
         dyn_key = f"v1+{nonce}+{timestamp_ms}"
         key_encoded = self.encode_normal_be(dyn_key, self.table)
@@ -719,17 +787,25 @@ class Korail:
     _sid_key = b"2485dd54d9deaa36"
     _device_id = "558a4f02041657ea"
 
-    def __init__(self, korail_id, korail_pw, auto_login=True, verbose=False):
+    def __init__(
+        self, korail_id, korail_pw, auto_login=True, verbose=False, device_profile=None
+    ):
         if HAS_CURL_CFFI:
             self._session = curl_cffi.Session(impersonate="chrome131_android")
         else:
             self._session = requests.session()
         self._session.headers.update(DEFAULT_HEADERS)
+        profile = device_profile or DEFAULT_DEVICE_PROFILE
+        if device_profile is not None:
+            # User-Agent와 DynaPath 서명(os=, dm=)이 항상 같은 기기를 가리키도록
+            # 같은 profile로 둘 다 채운다 — 하나만 바꾸면 그 불일치 자체가
+            # 탐지 신호가 된다.
+            self._session.headers["User-Agent"] = dalvik_user_agent(profile)
         self._device = "AD"
         self._version = "250601002"
         self._key = "korail1234567890"
         self._idx = None
-        self._engine = DynaPathMasterEngine()
+        self._engine = DynaPathMasterEngine(device_model=profile.model, os_version=profile.android)
         self.korail_id = normalize_phone(korail_id)
         self.korail_pw = korail_pw
         self.verbose = verbose
