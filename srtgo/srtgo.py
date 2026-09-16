@@ -569,7 +569,14 @@ def login(rail_type="SRT", debug=False):
 
 
 def reserve(rail_type="SRT", debug=False):
-    rail = login(rail_type, debug=debug)
+    try:
+        rail = login(rail_type, debug=debug)
+    except (SRTError, KorailError) as err:
+        # 예매 메뉴는 로그인 실패를 잡아주는 try/except가 없어서, 서버가 새로운
+        # 실패 응답을 보내면(예: 계정/서버 문제) 프로그램 전체가 크래시했다.
+        # set_login()과 동일하게 메시지만 출력하고 메뉴로 돌아간다.
+        print(err)
+        return
     is_srt = rail_type == "SRT"
 
     # Get date, time, stations, and passenger info
@@ -965,7 +972,11 @@ def _is_seat_available(train, seat_type, rail_type):
 
 
 def check_reservation(rail_type="SRT", debug=False):
-    rail = login(rail_type, debug=debug)
+    try:
+        rail = login(rail_type, debug=debug)
+    except (SRTError, KorailError) as err:
+        print(err)
+        return
 
     while True:
         reservations = (

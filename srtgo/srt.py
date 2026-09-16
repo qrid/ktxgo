@@ -737,8 +737,15 @@ class SRT:
         if "Your IP Address Blocked" in r.text:
             raise SRTLoginError(r.text.strip())
 
+        response = json.loads(r.text)
+        user_info = response.get("userMap")
+        if not user_info:
+            # 알려진 실패 문구(회원없음/비밀번호오류/IP차단) 목록에 없는 새로운
+            # 실패 응답 형태다 — userMap 없이 바로 인덱싱하면 KeyError로 원인
+            # 불명 크래시가 난다. 서버가 실제로 준 메시지를 그대로 노출한다.
+            raise SRTLoginError(response.get("MSG") or r.text.strip())
+
         self.is_login = True
-        user_info = json.loads(r.text)["userMap"]
         self.membership_number = user_info["MB_CRD_NO"]
         self.membership_name = user_info["CUST_NM"]
         self.phone_number = user_info["MBL_PHONE"]
