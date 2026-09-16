@@ -172,11 +172,29 @@ class Train(Schedule):
         return self.wait_reserve_flag == 9
 
 
+def _train_info_of(entry):
+    """승차권 항목에서 train_info 딕셔너리를 안전하게 꺼낸다.
+
+    ``entry["ticket_list"][0]["train_info"][0]`` 를 그대로 인덱싱하면 코레일이
+    필드를 하나만 빼먹어도 KeyError/IndexError로 승차권 목록 전체가 죽는다.
+    구조가 없거나, 있어도 내용이 빈 dict면(유령 승차권) None을 반환한다."""
+    ticket_list = entry.get("ticket_list")
+    if not isinstance(ticket_list, list) or not ticket_list:
+        return None
+    train_info = ticket_list[0].get("train_info")
+    if not isinstance(train_info, list) or not train_info:
+        return None
+    node = train_info[0]
+    return node if isinstance(node, dict) and node else None
+
+
 class Ticket(Train):
     """Train ticket information"""
 
     def __init__(self, data):
-        raw_data = data["ticket_list"][0]["train_info"][0]
+        raw_data = _train_info_of(data)
+        if raw_data is None:
+            raise ValueError("승차권 정보가 비어 있습니다")
         super().__init__(raw_data)
         self.seat_no_end = raw_data.get("h_seat_no_end")
         self.seat_no_count = int(raw_data.get("h_seat_cnt"))
@@ -729,17 +747,19 @@ class Korail:
         r = self._session.post(url, data=data)
         j = json.loads(r.text)
 
-        if j["strResult"] == "SUCC" and j.get("app.login.cphd"):
-            self._idx = j["app.login.cphd"]["idx"]
-            key = j["app.login.cphd"]["key"]
-            encrypt_key = key.encode("utf-8")
-            iv = key[:16].encode("utf-8")
-            cipher = AES.new(encrypt_key, AES.MODE_CBC, iv)
-            padded_data = pad(password.encode("utf-8"), AES.block_size)
-            return base64.b64encode(
-                base64.b64encode(cipher.encrypt(padded_data))
-            ).decode("utf-8")
-        return False
+        cipher_info = j.get("app.login.cphd") or {}
+        idx, key = cipher_info.get("idx"), cipher_info.get("key")
+        if j.get("strResult") != "SUCC" or not idx or not key:
+            return False
+
+        self._idx = idx
+        encrypt_key = key.encode("utf-8")
+        iv = key[:16].encode("utf-8")
+        cipher = AES.new(encrypt_key, AES.MODE_CBC, iv)
+        padded_data = pad(password.encode("utf-8"), AES.block_size)
+        return base64.b64encode(
+            base64.b64encode(cipher.encrypt(padded_data))
+        ).decode("utf-8")
 
     def login(self, korail_id=None, korail_pw=None):
         if korail_id:
@@ -773,11 +793,14 @@ class Korail:
         j = json.loads(r.text)
 
         if j.get("strResult") == "SUCC" and j.get("strMbCrdNo"):
+            # 회원번호까지 받았다면 로그인은 이미 성공한 것이다. 이름·이메일·
+            # 전화번호는 표시용 필드라 서버가 하나를 빼먹었다고 로그인 자체를
+            # 실패로 뒤집으면 안 된다 — .get()으로 관용적으로 읽는다.
             self._key = j.get("Key", self._key)
             self.membership_number = j["strMbCrdNo"]
-            self.name = j["strCustNm"]
-            self.email = j["strEmailAdr"]
-            self.phone_number = j["strCpNo"]
+            self.name = j.get("strCustNm")
+            self.email = j.get("strEmailAdr")
+            self.phone_number = j.get("strCpNo")
             print(
                 f"로그인 성공: {self.name} (멤버십번호: {self.membership_number}, 전화번호: {self.phone_number})"
             )
@@ -988,7 +1011,11 @@ class Korail:
             if self._result_check(j):
                 tickets = []
                 for info in j.get("reservation_list", []):
-                    ticket = Ticket(info)
+                    try:
+                        ticket = Ticket(info)
+                    except (ValueError, KeyError, IndexError, TypeError) as ex:
+                        self._log(f"승차권 항목을 건너뜁니다: {ex}")
+                        continue
                     data = {
                         "Device": self._device,
                         "Version": self._version,
